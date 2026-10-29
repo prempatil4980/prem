@@ -1,0 +1,13 @@
+using Microsoft.AspNetCore.Mvc;
+using HostelManagementMVC.Models;
+using HostelManagementMVC.Services;
+namespace HostelManagementMVC.Controllers;
+public class StudentsController(HostelStore store) : Controller
+{
+    public IActionResult Index(string? search) { var students=store.Students.AsEnumerable(); if(!string.IsNullOrWhiteSpace(search)) students=students.Where(s=>s.FullName.Contains(search,StringComparison.OrdinalIgnoreCase)||s.EnrollmentNo.Contains(search,StringComparison.OrdinalIgnoreCase)||s.RoomNumber.Contains(search,StringComparison.OrdinalIgnoreCase)); ViewBag.Search=search; return View(students.OrderBy(s=>s.FullName).ToList()); }
+    [HttpGet] public IActionResult Create() { ViewBag.Rooms=store.Rooms; return View(new Student()); }
+    [HttpPost, ValidateAntiForgeryToken] public IActionResult Create(Student student) { if(store.Students.Any(s=>s.EnrollmentNo==student.EnrollmentNo)) ModelState.AddModelError(nameof(student.EnrollmentNo),"This enrollment number already exists."); if(!store.Rooms.Any(r=>r.Number==student.RoomNumber)) ModelState.AddModelError(nameof(student.RoomNumber),"Select a valid room."); if(store.Rooms.Any(r=>r.Number==student.RoomNumber && store.Occupied(r.Number)>=r.Capacity)) ModelState.AddModelError(nameof(student.RoomNumber),"This room is full."); if(!ModelState.IsValid){ViewBag.Rooms=store.Rooms;return View(student);} store.Add(student); TempData["Message"]="Student added successfully."; return RedirectToAction(nameof(Index)); }
+    [HttpGet] public IActionResult Edit(int id) { var student=store.Find(id); if(student==null)return NotFound(); ViewBag.Rooms=store.Rooms; return View(student); }
+    [HttpPost, ValidateAntiForgeryToken] public IActionResult Edit(Student student) { if(store.Students.Any(s=>s.EnrollmentNo==student.EnrollmentNo&&s.Id!=student.Id))ModelState.AddModelError(nameof(student.EnrollmentNo),"This enrollment number already exists."); var room=store.Rooms.FirstOrDefault(r=>r.Number==student.RoomNumber); if(room==null)ModelState.AddModelError(nameof(student.RoomNumber),"Select a valid room."); else if(store.Students.Count(s=>s.RoomNumber==student.RoomNumber&&s.Id!=student.Id)>=room.Capacity)ModelState.AddModelError(nameof(student.RoomNumber),"This room is full."); if(!ModelState.IsValid){ViewBag.Rooms=store.Rooms;return View(student);} store.Update(student); TempData["Message"]="Student details updated."; return RedirectToAction(nameof(Index)); }
+    [HttpPost, ValidateAntiForgeryToken] public IActionResult Delete(int id) { store.Delete(id); TempData["Message"]="Student record deleted."; return RedirectToAction(nameof(Index)); }
+}
